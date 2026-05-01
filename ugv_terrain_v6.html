@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>UGV Terrain Intelligence v6</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f0f4f8;--s1:#ffffff;--s2:#e8eef5;--bd:#c5d4e0;
+  --acc:#0077cc;--red:#e02040;--grn:#1a9e00;--yel:#c88000;
+  --txt:#1a2a38;--mut:#6a8099;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--txt);font-family:'Space Mono',monospace;height:100vh;overflow:hidden;display:flex;flex-direction:column;}
+
+.hdr{background:var(--s1);border-bottom:1px solid var(--bd);padding:6px 14px;display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.logo{font-family:'Orbitron',sans-serif;font-size:14px;font-weight:900;color:var(--acc);letter-spacing:4px;}
+.logo span{color:var(--red);}
+.hdr-title{font-size:10px;font-weight:700;letter-spacing:1px;}
+.hdr-sub{font-size:7px;color:var(--mut);margin-top:1px;}
+.live-badge{margin-left:auto;font-size:7px;color:var(--grn);border:1px solid var(--grn);padding:2px 7px;border-radius:2px;letter-spacing:2px;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{box-shadow:0 0 4px rgba(57,255,20,.2);}50%{box-shadow:0 0 10px rgba(57,255,20,.5);}}
+
+.toolbar{background:var(--s2);border-bottom:1px solid var(--bd);padding:4px 14px;display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap;}
+.tlbl{font-size:7px;color:var(--mut);letter-spacing:1px;}
+.tbtn{background:var(--s1);border:1px solid var(--bd);color:var(--mut);padding:3px 9px;border-radius:3px;font-family:'Space Mono',monospace;font-size:8px;cursor:pointer;transition:all .15s;}
+.tbtn:hover,.tbtn.on{border-color:var(--acc);color:var(--acc);background:rgba(0,255,231,.06);}
+.sep{width:1px;height:18px;background:var(--bd);}
+.abtn{background:rgba(0,255,231,.08);border:1px solid var(--acc);color:var(--acc);padding:3px 11px;border-radius:3px;font-family:'Space Mono',monospace;font-size:8px;cursor:pointer;transition:all .15s;}
+.abtn:hover{background:rgba(0,255,231,.18);}
+.wbtn{background:rgba(255,64,96,.08);border:1px solid var(--red);color:var(--red);padding:3px 11px;border-radius:3px;font-family:'Space Mono',monospace;font-size:8px;cursor:pointer;}
+.wbtn:hover{background:rgba(255,64,96,.18);}
+
+.statusbar{background:rgba(240,244,248,.98);border-bottom:1px solid var(--bd);padding:3px 14px;display:flex;gap:16px;align-items:center;flex-shrink:0;}
+.st{font-size:7px;color:var(--mut);}.st b{color:var(--txt);}
+.route-status{margin-left:auto;font-size:7px;font-weight:700;padding:1px 7px;border-radius:2px;}
+.route-status.ok{color:var(--grn);border:1px solid var(--grn);background:rgba(57,255,20,.07);}
+.route-status.warn{color:var(--yel);border:1px solid var(--yel);background:rgba(255,214,0,.07);}
+.route-status.err{color:var(--red);border:1px solid var(--red);background:rgba(255,64,96,.07);}
+
+.main{display:grid;grid-template-columns:170px 1fr 230px;flex:1;overflow:hidden;min-height:0;}
+
+.left{background:var(--s1);border-right:1px solid var(--bd);overflow-y:auto;padding:7px;}
+.left::-webkit-scrollbar{width:3px;}
+.left::-webkit-scrollbar-thumb{background:var(--bd);}
+.sec-hd{font-size:7px;color:var(--mut);letter-spacing:2px;text-transform:uppercase;margin:7px 0 4px;padding-bottom:3px;border-bottom:1px solid var(--bd);}
+.lcard{background:var(--s2);border:1px solid var(--bd);border-left:3px solid transparent;border-radius:4px;padding:6px 8px;cursor:pointer;margin-bottom:4px;transition:all .18s;}
+.lcard:hover{border-left-color:var(--acc);transform:translateX(2px);}
+.lcard.active{border-left-color:var(--acc);border-color:var(--acc);background:rgba(0,255,231,.05);}
+.lname{font-size:9px;font-weight:700;color:var(--txt);margin-bottom:2px;}
+.lreg{font-size:7px;color:var(--mut);margin-bottom:3px;}
+.lbadges{display:flex;gap:3px;flex-wrap:wrap;}
+.badge{font-size:6px;padding:1px 4px;border-radius:2px;border:1px solid;}
+
+.canvas-area{position:relative;overflow:hidden;background:#c8dce8;}
+#terrainCanvas{display:block;width:100%;height:100%;}
+
+.hud-tl{position:absolute;top:8px;left:8px;background:rgba(255,255,255,.93);border:1px solid var(--bd);border-radius:4px;padding:7px 10px;min-width:130px;backdrop-filter:blur(4px);z-index:10;}
+.hud-bl{position:absolute;bottom:8px;left:8px;background:rgba(255,255,255,.93);border:1px solid var(--bd);border-radius:4px;padding:6px 9px;backdrop-filter:blur(4px);z-index:10;}
+.hud-br{position:absolute;bottom:8px;right:8px;background:rgba(255,255,255,.93);border:1px solid var(--bd);border-radius:4px;padding:6px 9px;backdrop-filter:blur(4px);z-index:10;}
+.hlbl{font-size:6px;color:var(--mut);letter-spacing:1px;margin-bottom:2px;}
+.hval{font-size:11px;font-weight:700;}
+.hval-sm{font-size:8px;color:var(--mut);margin-top:1px;}
+.prog-row{display:flex;justify-content:space-between;font-size:6px;color:var(--mut);margin-bottom:2px;margin-top:4px;}
+.prog-bg{height:3px;background:var(--bd);border-radius:2px;overflow:hidden;width:115px;}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--acc),var(--grn));border-radius:2px;transition:width .1s;}
+
+.alert-banner{position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:20;font-size:9px;font-weight:700;padding:4px 14px;border-radius:3px;display:none;white-space:nowrap;pointer-events:none;}
+.alert-banner.show{display:block;animation:alertIn .2s ease;}
+@keyframes alertIn{from{transform:translateX(-50%) scale(.85);opacity:0;}to{transform:translateX(-50%) scale(1);opacity:1;}}
+.alert-banner.danger{background:rgba(255,64,96,.96);color:#fff;box-shadow:0 0 18px rgba(255,64,96,.5);}
+.alert-banner.reroute{background:rgba(255,214,0,.96);color:#000;box-shadow:0 0 18px rgba(255,214,0,.4);}
+.alert-banner.safe{background:rgba(57,255,20,.92);color:#000;box-shadow:0 0 18px rgba(57,255,20,.4);}
+.alert-banner.warn{background:rgba(255,140,0,.95);color:#000;}
+
+/* AI panel overlay */
+.ai-panel{position:absolute;top:50%;right:10px;transform:translateY(-50%);background:rgba(255,255,255,.97);border:1px solid var(--yel);border-radius:6px;padding:10px 12px;width:165px;z-index:15;display:none;}
+.ai-panel.show{display:block;animation:panelIn .3s ease;}
+@keyframes panelIn{from{opacity:0;right:0;}to{opacity:1;right:10px;}}
+.ai-panel-title{font-size:8px;color:var(--yel);font-weight:700;letter-spacing:1px;margin-bottom:6px;}
+.ai-panel-row{font-size:7px;color:var(--txt);margin-bottom:4px;line-height:1.5;}
+.ai-panel-row span{color:var(--red);}
+.ai-panel-row.ok span{color:var(--grn);}
+.ai-panel-arrow{margin-top:6px;font-size:13px;color:var(--grn);text-align:center;animation:arrowPulse 0.8s ease-in-out infinite;}
+@keyframes arrowPulse{0%,100%{opacity:.5;}50%{opacity:1;}}
+
+/* Rock detect badge */
+.rock-badge{position:absolute;font-size:8px;font-weight:700;padding:3px 8px;border-radius:3px;background:rgba(255,64,96,.95);color:#fff;border:1px solid #ff8080;display:none;pointer-events:none;z-index:18;white-space:nowrap;}
+.rock-badge.show{display:block;animation:alertIn .2s ease;}
+
+.right{background:var(--s1);border-left:1px solid var(--bd);overflow-y:auto;display:flex;flex-direction:column;}
+.right::-webkit-scrollbar{width:3px;}
+.right::-webkit-scrollbar-thumb{background:var(--bd);}
+.rsec{padding:8px 10px;border-bottom:1px solid var(--bd);}
+.rtitle{font-size:6px;color:var(--mut);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;}
+.sg2{display:grid;grid-template-columns:1fr 1fr;gap:4px;}
+.sbox{background:var(--s2);border:1px solid var(--bd);border-radius:3px;padding:5px 6px;}
+.sbl{font-size:6px;color:var(--mut);margin-bottom:1px;}
+.sbv{font-size:11px;font-weight:700;}
+.cbar{margin-bottom:4px;}
+.crow{display:flex;justify-content:space-between;font-size:8px;margin-bottom:2px;align-items:center;}
+.cdot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-right:3px;}
+.cbg{height:3px;background:var(--bd);border-radius:2px;overflow:hidden;}
+.cfill{height:100%;border-radius:2px;}
+.iou-row{display:flex;align-items:center;gap:4px;margin-bottom:3px;}
+.idot{width:5px;height:5px;border-radius:50%;}
+.iname{font-size:7px;flex:1;}
+.ibg{width:40px;height:3px;background:var(--bd);border-radius:2px;overflow:hidden;}
+.inum{font-size:6px;color:var(--mut);min-width:28px;text-align:right;}
+.seg-strip{display:flex;height:12px;border-radius:3px;overflow:hidden;margin-bottom:3px;}
+.seg-chunk{height:100%;display:flex;align-items:center;justify-content:center;font-size:5px;font-weight:700;color:rgba(0,0,0,.6);}
+.ai-box{background:var(--s2);border:1px solid rgba(0,119,204,.18);border-radius:4px;padding:7px 8px;font-size:8px;line-height:1.6;color:var(--mut);min-height:55px;}
+.ai-box.loading{animation:abl 1.2s infinite;}
+@keyframes abl{0%,100%{border-color:rgba(0,119,204,.15);}50%{border-color:rgba(0,119,204,.5);}}
+.ai-box.done{color:var(--txt);}
+.cur{display:inline-block;width:2px;height:8px;background:var(--acc);animation:blink .6s step-end infinite;vertical-align:middle;}
+@keyframes blink{50%{opacity:0;}}
+.leg-item{display:flex;align-items:center;gap:4px;margin-bottom:3px;}
+.leg-dot{width:7px;height:7px;border-radius:2px;flex-shrink:0;}
+.leg-name{font-size:7px;color:var(--mut);}
+
+/* Path key */
+.path-key{position:absolute;top:8px;right:8px;background:rgba(255,255,255,.92);border:1px solid var(--bd);border-radius:4px;padding:5px 8px;z-index:10;}
+.pk-row{display:flex;align-items:center;gap:5px;font-size:6px;color:var(--mut);margin-bottom:2px;}
+.pk-line{width:22px;height:2px;border-radius:2px;}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="logo">UGV<span>.</span>AI</div>
+  <div>
+    <div class="hdr-title">TERRAIN INTELLIGENCE SYSTEM v6</div>
+    <div class="hdr-sub">MULTI-PATH · ROCK DETECTION · AI PATH CORRECTION · REAL-TIME SEGMENTATION</div>
+  </div>
+  <div class="live-badge">● LIVE</div>
+</div>
+
+<div class="toolbar">
+  <span class="tlbl">WEATHER:</span>
+  <button class="tbtn on" onclick="setWx('clear',this)">☀ CLEAR</button>
+  <button class="tbtn"    onclick="setWx('rain',this)">🌧 RAIN</button>
+  <button class="tbtn"    onclick="setWx('fog',this)">🌫 FOG</button>
+  <button class="tbtn"    onclick="setWx('night',this)">🌙 NIGHT</button>
+  <div class="sep"></div>
+  <button class="tbtn" id="pbtn" onclick="togglePause()">⏸ PAUSE</button>
+  <button class="tbtn" onclick="resetUGV()">↺ RESET</button>
+  <button class="wbtn" onclick="triggerWrongPath()">⚠ TRIGGER WRONG PATH</button>
+  <div class="sep"></div>
+  <button class="abtn" onclick="runAIPredict()">⚡ AI PREDICT</button>
+</div>
+
+<div class="statusbar">
+  <div class="st">LOCATION: <b id="st-loc">—</b></div>
+  <div class="st">TERRAIN: <b id="st-terrain">—</b></div>
+  <div class="st">SPEED: <b id="st-spd">—</b></div>
+  <div class="st">ZONE: <b id="st-zone" style="color:var(--acc);">—</b></div>
+  <div class="st">WEATHER: <b id="st-wx">CLEAR</b></div>
+  <div class="route-status ok" id="route-status">▶ ON ROUTE</div>
+</div>
+
+<div class="main">
+
+  <!-- LEFT -->
+  <div class="left">
+    <div class="sec-hd">Locations</div>
+    <div class="lcard active" id="loc-0" onclick="selectLoc(0)">
+      <div class="lname">Black Forest</div><div class="lreg">Germany · 48.07°N</div>
+      <div class="lbadges"><span class="badge" style="color:#4a9e4a;border-color:#4a9e4a;">DENSE</span><span class="badge" style="color:#ffd600;border-color:#ffd600;">MED RISK</span></div>
+    </div>
+    <div class="lcard" id="loc-1" onclick="selectLoc(1)">
+      <div class="lname">Amazon Rainforest</div><div class="lreg">Brazil · 3.46°S</div>
+      <div class="lbadges"><span class="badge" style="color:#ff4060;border-color:#ff4060;">HIGH RISK</span><span class="badge" style="color:#7dc47d;border-color:#7dc47d;">JUNGLE</span></div>
+    </div>
+    <div class="lcard" id="loc-2" onclick="selectLoc(2)">
+      <div class="lname">Tongass Forest</div><div class="lreg">Alaska, USA · 57.3°N</div>
+      <div class="lbadges"><span class="badge" style="color:#6ab0e8;border-color:#6ab0e8;">COLD</span><span class="badge" style="color:#ffd600;border-color:#ffd600;">MED RISK</span></div>
+    </div>
+    <div class="lcard" id="loc-3" onclick="selectLoc(3)">
+      <div class="lname">Białowieża</div><div class="lreg">Poland · 52.7°N</div>
+      <div class="lbadges"><span class="badge" style="color:#39ff14;border-color:#39ff14;">LOW RISK</span><span class="badge" style="color:#4a9e4a;border-color:#4a9e4a;">ANCIENT</span></div>
+    </div>
+    <div class="lcard" id="loc-4" onclick="selectLoc(4)">
+      <div class="lname">Kinabalu Forest</div><div class="lreg">Borneo · 6.07°N</div>
+      <div class="lbadges"><span class="badge" style="color:#ff4060;border-color:#ff4060;">HIGH RISK</span><span class="badge" style="color:#7dc47d;border-color:#7dc47d;">TROPICAL</span></div>
+    </div>
+    <div class="sec-hd" style="margin-top:8px;">Class Legend</div>
+    <div id="legend-list"></div>
+  </div>
+
+  <!-- CANVAS -->
+  <div class="canvas-area">
+    <canvas id="terrainCanvas"></canvas>
+
+    <div class="hud-tl">
+      <div class="hlbl">UGV STATUS</div>
+      <div class="hval" id="h-risk" style="color:var(--grn);">SELECT LOC</div>
+      <div class="hval-sm" id="h-speed">— km/h</div>
+      <div class="prog-row"><span>PATH PROGRESS</span><span id="h-pct">0%</span></div>
+      <div class="prog-bg"><div class="prog-fill" id="h-prog" style="width:0%"></div></div>
+    </div>
+
+    <div class="hud-bl">
+      <div class="hlbl">CURRENT ZONE</div>
+      <div class="hval" id="h-zone" style="color:var(--acc);font-size:9px;">—</div>
+      <div class="hval-sm" id="h-conf">CONF: —</div>
+    </div>
+
+    <div class="hud-br">
+      <div class="hlbl">UGV COORDS</div>
+      <div style="font-size:8px;color:var(--acc);" id="h-coords">—</div>
+    </div>
+
+    <!-- Path legend key -->
+    <div class="path-key" id="path-key-panel" style="display:none;">
+      <div class="pk-row"><div class="pk-line" style="background:var(--acc);"></div> SAFE PATH A (Main)</div>
+      <div class="pk-row"><div class="pk-line" style="background:#ffd600;"></div> SAFE PATH B (Alt)</div>
+      <div class="pk-row"><div class="pk-line" style="background:var(--red);height:1px;border:1px dashed var(--red);background:none;"></div> WRONG PATH</div>
+      <div class="pk-row"><div class="pk-line" style="background:var(--grn);"></div> AI CORRECTED</div>
+    </div>
+
+    <div class="alert-banner" id="alert-banner"></div>
+
+    <!-- Rock detected badge -->
+    <div class="rock-badge" id="rock-badge">🪨 ROCK DETECTED — REVERSING</div>
+
+    <!-- AI correction panel -->
+    <div class="ai-panel" id="ai-panel">
+      <div class="ai-panel-title">⚡ AI PATH CORRECTION</div>
+      <div class="ai-panel-row" id="ap-line1"><span>⚠ Rock/Obstacle detected</span> — stopping vehicle</div>
+      <div class="ai-panel-row" id="ap-line2">Reversing away from danger zone</div>
+      <div class="ai-panel-row ok" id="ap-line3">Switching to <span>Path B</span> — safe corridor</div>
+      <div class="ai-panel-arrow">↩ REROUTING TO PATH B</div>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="right">
+    <div class="rsec">
+      <div class="rtitle">UGV Telemetry</div>
+      <div class="sg2">
+        <div class="sbox"><div class="sbl">SAFETY</div><div class="sbv" id="sv-safe" style="color:var(--grn);">—</div></div>
+        <div class="sbox"><div class="sbl">SPEED</div><div class="sbv" id="sv-spd">—</div></div>
+        <div class="sbox"><div class="sbl">OBSTACLES</div><div class="sbv" id="sv-obs" style="color:var(--yel);">—</div></div>
+        <div class="sbox"><div class="sbl">RISK</div><div class="sbv" id="sv-risk">—</div></div>
+      </div>
+    </div>
+    <div class="rsec">
+      <div class="rtitle">Terrain Segmentation</div>
+      <div class="seg-strip" id="seg-strip"></div>
+      <div id="tbars" style="margin-top:4px;"></div>
+    </div>
+    <div class="rsec">
+      <div class="rtitle">Prediction Confidence</div>
+      <div id="cbars"><span style="font-size:7px;color:var(--mut);">Select location...</span></div>
+    </div>
+    <div class="rsec">
+      <div class="rtitle">Per-Class IoU · mIoU <span style="color:var(--acc);">0.4866</span></div>
+      <div id="ioulist"></div>
+    </div>
+    <div class="rsec">
+      <div class="rtitle">Live Speed Graph · km/h</div>
+      <canvas id="speedGraph" width="210" height="70" style="width:100%;display:block;border-radius:3px;background:var(--bg);border:1px solid var(--bd);"></canvas>
+    </div>
+    <div class="rsec" style="flex:1;">
+      <div class="rtitle">AI Terrain Analysis</div>
+      <div class="ai-box" id="aibox">Select a location to begin analysis...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════
+const CLASSES=[
+  {name:'Sky',        color:'#6ab0e8',iou:.9722},
+  {name:'Trees',      color:'#2d7a2d',iou:.7352},
+  {name:'Lush bushes',color:'#5daa5d',iou:.5610},
+  {name:'Dry bushes', color:'#8c6e30',iou:.4210},
+  {name:'Landscape',  color:'#b8a060',iou:.5620},
+  {name:'G.Clutter',  color:'#7a6040',iou:.2370},
+  {name:'Dry grass',  color:'#c4a83a',iou:.6200},
+  {name:'Rocks',      color:'#787878',iou:.1980},
+  {name:'Logs',       color:'#a05028',iou:.1190},
+];
+const LOCS=[
+  {name:'Black Forest',      region:'Germany',type:'forest'},
+  {name:'Amazon Rainforest', region:'Brazil', type:'jungle'},
+  {name:'Tongass Forest',    region:'Alaska', type:'cold'},
+  {name:'Białowieża Forest', region:'Poland', type:'ancient'},
+  {name:'Kinabalu Forest',   region:'Borneo', type:'jungle'},
+];
+const TERRAIN_DATA={
+  forest:{label:'Temperate Forest',safe:60,speed:7,obs:5,risk:'MEDIUM',rc:'#ffd600',
+    weights:[.14,.30,.20,.12,.09,.07,.05,.02,.01],danger:['Logs','G.Clutter'],
+    conf:{'Sky':[{n:'Sky',v:.97,c:'#6ab0e8'}],'Trees':[{n:'Trees',v:.82,c:'#2d7a2d'}],
+      'Lush bushes':[{n:'Lush bushes',v:.71,c:'#5daa5d'}],'Dry bushes':[{n:'Dry bushes',v:.65,c:'#8c6e30'}],
+      'Landscape':[{n:'Landscape',v:.68,c:'#b8a060'}],'G.Clutter':[{n:'G.Clutter',v:.55,c:'#7a6040'}],
+      'Dry grass':[{n:'Dry grass',v:.73,c:'#c4a83a'}],'Rocks':[{n:'Rocks',v:.42,c:'#787878'}],
+      'Logs':[{n:'Logs',v:.31,c:'#a05028'}]}},
+  jungle:{label:'Dense Jungle',safe:28,speed:3,obs:12,risk:'HIGH',rc:'#ff4060',
+    weights:[.10,.35,.22,.10,.07,.07,.05,.03,.01],danger:['Logs','G.Clutter','Rocks'],
+    conf:{'Sky':[{n:'Sky',v:.95,c:'#6ab0e8'}],'Trees':[{n:'Trees',v:.78,c:'#2d7a2d'}],
+      'Lush bushes':[{n:'Lush bushes',v:.68,c:'#5daa5d'}],'Dry bushes':[{n:'Dry bushes',v:.60,c:'#8c6e30'}],
+      'Landscape':[{n:'Landscape',v:.62,c:'#b8a060'}],'G.Clutter':[{n:'G.Clutter',v:.55,c:'#7a6040'}],
+      'Dry grass':[{n:'Dry grass',v:.65,c:'#c4a83a'}],'Rocks':[{n:'Rocks',v:.38,c:'#787878'}],
+      'Logs':[{n:'Logs',v:.31,c:'#a05028'}]}},
+  cold:{label:'Cold Boreal',safe:45,speed:5,obs:7,risk:'MEDIUM',rc:'#ffd600',
+    weights:[.18,.28,.12,.12,.10,.08,.05,.05,.02],danger:['Rocks','Logs'],
+    conf:{'Sky':[{n:'Sky',v:.96,c:'#6ab0e8'}],'Trees':[{n:'Trees',v:.80,c:'#2d7a2d'}],
+      'Lush bushes':[{n:'Lush bushes',v:.68,c:'#5daa5d'}],'Dry bushes':[{n:'Dry bushes',v:.62,c:'#8c6e30'}],
+      'Landscape':[{n:'Landscape',v:.65,c:'#b8a060'}],'G.Clutter':[{n:'G.Clutter',v:.52,c:'#7a6040'}],
+      'Dry grass':[{n:'Dry grass',v:.70,c:'#c4a83a'}],'Rocks':[{n:'Rocks',v:.42,c:'#787878'}],
+      'Logs':[{n:'Logs',v:.35,c:'#a05028'}]}},
+  ancient:{label:'Ancient Forest',safe:65,speed:8,obs:4,risk:'LOW',rc:'#39ff14',
+    weights:[.15,.35,.18,.12,.08,.06,.04,.01,.01],danger:['G.Clutter'],
+    conf:{'Sky':[{n:'Sky',v:.97,c:'#6ab0e8'}],'Trees':[{n:'Trees',v:.88,c:'#2d7a2d'}],
+      'Lush bushes':[{n:'Lush bushes',v:.74,c:'#5daa5d'}],'Dry bushes':[{n:'Dry bushes',v:.66,c:'#8c6e30'}],
+      'Landscape':[{n:'Landscape',v:.70,c:'#b8a060'}],'G.Clutter':[{n:'G.Clutter',v:.58,c:'#7a6040'}],
+      'Dry grass':[{n:'Dry grass',v:.75,c:'#c4a83a'}],'Rocks':[{n:'Rocks',v:.44,c:'#787878'}],
+      'Logs':[{n:'Logs',v:.32,c:'#a05028'}]}},
+};
+const WX={
+  clear:{label:'CLEAR',sm:1.0},rain:{label:'RAIN',sm:.55},
+  fog:{label:'FOG',sm:.35},night:{label:'NIGHT',sm:.3},
+};
+
+// ═══════════════════════════════════════════
+// CANVAS STATE
+// ═══════════════════════════════════════════
+let cv,ctx,W,H;
+let curLoc=0,curWx='clear',paused=false;
+
+// UGV movement
+// Phases: 0=normal on pathA, 1=heading wrong, 2=rock-detected(stop), 3=reversing, 4=switching to pathB, 5=on pathB
+let ugvPhase=0;
+let ugvT=0;      // progress on current segment
+let wrongT=0;    // progress on wrong branch
+let reverseT=0;  // progress reversing back
+let pathBT=0;    // progress on path B after correction
+
+let alertTimer=null,animId=null;
+let scene=null;
+
+// Noise
+function hash(x,y){let h=((x*374761393+y*668265263)^(x>>13)^(y>>7))>>>0;return(h&0xffff)/65535;}
+function sn(x,y,f){const fx=x*f,fy=y*f,ix=Math.floor(fx),iy=Math.floor(fy),dx=fx-ix,dy=fy-iy,u=dx*dx*(3-2*dx),v=dy*dy*(3-2*dy);return hash(ix,iy)+(hash(ix+1,iy)-hash(ix,iy))*u+(hash(ix,iy+1)-hash(ix,iy))*v+(hash(ix+1,iy+1)-hash(ix+1,iy)-hash(ix,iy+1)+hash(ix,iy))*u*v;}
+function fbm(x,y){return sn(x,y,1.8)*.5+sn(x,y,4)*.3+sn(x,y,9)*.2;}
+
+// ═══════════════════════════════════════════
+// SCENE DEFINITION — 3 PATHS
+// ═══════════════════════════════════════════
+// PATH A: main safe route (top half of ground) — S-curve
+// PATH B: alternative safe route (lower) — joins end
+// WRONG: branch that forks off PATH A toward rocks, then reverses, then switches to path B
+function buildScene(){
+  // PATH A — main path, runs upper portion of terrain (ry ~0.45-0.58)
+  const pathA=[
+    {rx:0.01,ry:0.55},
+    {rx:0.08,ry:0.52},
+    {rx:0.15,ry:0.56},
+    {rx:0.22,ry:0.50},
+    {rx:0.30,ry:0.53},
+    {rx:0.37,ry:0.50},
+    // FORK POINT — wrong path splits here
+    {rx:0.44,ry:0.52}, // <-- fork
+    {rx:0.52,ry:0.49},
+    {rx:0.60,ry:0.52},
+    {rx:0.67,ry:0.49},
+    {rx:0.74,ry:0.52},
+    {rx:0.82,ry:0.50},
+    {rx:0.90,ry:0.53},
+    {rx:0.99,ry:0.51},
+  ];
+
+  // PATH B — lower alternative route
+  const pathB=[
+    {rx:0.01,ry:0.68},
+    {rx:0.09,ry:0.72},
+    {rx:0.17,ry:0.68},
+    {rx:0.25,ry:0.71},
+    {rx:0.33,ry:0.67},
+    {rx:0.42,ry:0.70},
+    {rx:0.50,ry:0.66},
+    {rx:0.58,ry:0.69},
+    {rx:0.66,ry:0.65},
+    {rx:0.75,ry:0.68},
+    {rx:0.83,ry:0.65},
+    {rx:0.91,ry:0.68},
+    {rx:0.99,ry:0.65},
+  ];
+
+  // WRONG BRANCH — from fork point goes toward rocks (lower right of fork)
+  const wrongBranch=[
+    {rx:0.44,ry:0.52}, // fork point (same as pathA[6])
+    {rx:0.45,ry:0.58},
+    {rx:0.46,ry:0.64},
+    {rx:0.46,ry:0.70}, // approaches rock zone
+    {rx:0.46,ry:0.74}, // rock here — STOP
+  ];
+
+  // REVERSE PATH — backs from rock back to fork
+  const reversePath=[
+    {rx:0.46,ry:0.74},
+    {rx:0.46,ry:0.70},
+    {rx:0.46,ry:0.64},
+    {rx:0.45,ry:0.58},
+    {rx:0.44,ry:0.52}, // back at fork
+    {rx:0.43,ry:0.59}, // merge toward path B
+    {rx:0.42,ry:0.66},
+    {rx:0.42,ry:0.70}, // onto path B
+  ];
+
+  // Rock positions (canonical)
+  const rocks=[
+    {rx:0.46,ry:0.76},{rx:0.49,ry:0.74},{rx:0.44,ry:0.78},
+    {rx:0.67,ry:0.62},{rx:0.70,ry:0.65},
+  ];
+
+  return{pathA,pathB,wrongBranch,reversePath,rocks};
+}
+
+// ═══════════════════════════════════════════
+// DRAW
+// ═══════════════════════════════════════════
+function drawAll(){
+  if(!scene) return;
+  ctx.clearRect(0,0,W,H);
+  const skyH=Math.round(H*0.30);
+  drawSky(skyH);
+  drawGround(skyH);
+  drawFarTreeLine(skyH);
+  drawDirtPath(scene.pathA,'#9a8060',28,skyH); // Path A dirt
+  drawDirtPath(scene.pathB,'#8a9060',24,skyH); // Path B dirt (slightly greener)
+  drawTrees(skyH);
+  drawGroundFeatures(skyH);
+  // Rocks on wrong branch clearly visible
+  drawRockCluster(skyH);
+  // Drawn path overlays
+  drawPathLine(scene.pathA,'rgba(0,255,231,0.28)',14,false);
+  drawPathLine(scene.pathA,'rgba(0,255,231,0.90)',2,true);
+  drawPathLine(scene.pathB,'rgba(255,214,0,0.25)',12,false);
+  drawPathLine(scene.pathB,'rgba(255,214,0,0.85)',2,true);
+
+  // Path labels
+  labelPath(scene.pathA[2],'PATH A','rgba(0,255,231,0.9)');
+  labelPath(scene.pathB[2],'PATH B','rgba(255,214,0,0.9)');
+
+  // Wrong branch (only when active)
+  if(ugvPhase>=1){
+    const prog=ugvPhase===1?Math.min(wrongT,1):1;
+    drawPartialPath(scene.wrongBranch,'rgba(255,64,96,0.85)',2.5,[8,5],prog);
+  }
+
+  // Reverse / correction path (phase 3+)
+  if(ugvPhase>=3){
+    const prog=ugvPhase===3?Math.min(reverseT,1):1;
+    drawPartialPath(scene.reversePath,'rgba(57,255,20,0.90)',2,[10,4],prog);
+  }
+
+  // Suggested path B glow when rerouting (phase 4+)
+  if(ugvPhase>=4){
+    drawPathLine(scene.pathB,'rgba(57,255,20,0.45)',16,false);
+  }
+
+  // Path B progress (phase 5)
+  if(ugvPhase===5){
+    const prog=Math.min(pathBT,1);
+    drawPartialPath(scene.pathB,'rgba(57,255,20,0.80)',2,[12,0],prog);
+  }
+
+  // Weather
+  applyWeather();
+
+  // Markers
+  const a=scene.pathA, b=scene.pathB;
+  drawMarker(a[0].rx*W,a[0].ry*H,'#39ff14','START');
+  drawMarker(a[a.length-1].rx*W,a[a.length-1].ry*H,'#ff4060','END A');
+  drawMarker(b[b.length-1].rx*W,b[b.length-1].ry*H,'#ffd600','END B');
+
+  // Fork indicator
+  const fork=scene.pathA[6];
+  drawForkMarker(fork.rx*W,fork.ry*H);
+
+  drawUGV();
+  updateHUD();
+}
+
+function drawSky(skyH){
+  const g=ctx.createLinearGradient(0,0,0,skyH);
+  if(curWx==='night'){g.addColorStop(0,'#050a1a');g.addColorStop(1,'#0a1830');}
+  else if(curWx==='fog'){g.addColorStop(0,'#b0c0d0');g.addColorStop(1,'#90a8bc');}
+  else{g.addColorStop(0,'#3a78c8');g.addColorStop(1,'#78b0e0');}
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,skyH);
+
+  // Clouds
+  if(curWx!=='night'){
+    ctx.save();ctx.globalAlpha=0.5;
+    [[0.12,0.30],[0.42,0.22],[0.70,0.35],[0.87,0.25]].forEach(([rx,ry])=>{
+      const cx=rx*W,cy=ry*skyH;
+      const cg=ctx.createRadialGradient(cx,cy,0,cx,cy,45);
+      cg.addColorStop(0,'rgba(255,255,255,0.95)');cg.addColorStop(1,'rgba(255,255,255,0)');
+      ctx.fillStyle=cg;
+      ctx.beginPath();ctx.ellipse(cx,cy,48,22,0,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.ellipse(cx+25,cy+6,32,16,0,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.ellipse(cx-20,cy+8,28,14,0,0,Math.PI*2);ctx.fill();
+    });
+    ctx.restore();
+  }
+  // Stars at night
+  if(curWx==='night'){
+    ctx.save();ctx.fillStyle='#fff';
+    for(let i=0;i<60;i++){const x=hash(i,1)*W,y=hash(i,2)*skyH;ctx.globalAlpha=0.3+hash(i,3)*0.7;ctx.beginPath();ctx.arc(x,y,0.7,0,Math.PI*2);ctx.fill();}
+    ctx.restore();
+  }
+}
+
+function drawGround(skyH){
+  const gnd_y=skyH;
+  const g=ctx.createLinearGradient(0,gnd_y,0,H);
+  g.addColorStop(0,'#4a7038');g.addColorStop(0.35,'#3e6030');g.addColorStop(1,'#2a4820');
+  ctx.fillStyle=g;ctx.fillRect(0,gnd_y,W,H-gnd_y);
+
+  // Noise texture
+  const id=ctx.createImageData(W,H-gnd_y);
+  for(let py=0;py<H-gnd_y;py+=2){
+    for(let px=0;px<W;px+=2){
+      const n=fbm(px/100+3.7,py/90+1.2);
+      const v=Math.round((n-0.5)*42);
+      for(let dy2=0;dy2<2&&py+dy2<H-gnd_y;dy2++){
+        for(let dx2=0;dx2<2&&px+dx2<W;dx2++){
+          const idx=((py+dy2)*W+(px+dx2))*4;
+          id.data[idx]=v;id.data[idx+1]=v;id.data[idx+2]=v;id.data[idx+3]=50;
+        }
+      }
+    }
+  }
+  ctx.putImageData(id,0,gnd_y);
+
+  // Green patches
+  [[0.1,0.72,0.14,'rgba(60,110,40,.40)'],[0.28,0.82,0.11,'rgba(80,130,50,.35)'],
+   [0.72,0.78,0.12,'rgba(55,100,38,.38)'],[0.88,0.85,0.09,'rgba(100,140,60,.32)'],
+   [0.52,0.88,0.13,'rgba(130,160,70,.28)'],[0.60,0.74,0.07,'rgba(160,140,60,.32)']
+  ].forEach(([rx,ry,r,col])=>{
+    const cx=rx*W,cy=ry*(H-gnd_y)+gnd_y,radiusX=r*W*.9,radiusY=r*(H-gnd_y)*.45;
+    const grad=ctx.createRadialGradient(cx,cy,0,cx,cy,Math.max(radiusX,radiusY));
+    grad.addColorStop(0,col);grad.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=grad;ctx.beginPath();ctx.ellipse(cx,cy,radiusX,radiusY,0,0,Math.PI*2);ctx.fill();
+  });
+}
+
+function drawFarTreeLine(skyH){
+  // Background treeline silhouette
+  ctx.save();ctx.fillStyle='rgba(28,55,22,0.88)';
+  ctx.beginPath();ctx.moveTo(0,skyH+70);
+  for(let i=0;i<=W;i+=3){
+    const n=sn(i*0.007,0,1.0);
+    ctx.lineTo(i,skyH+n*45+5);
+  }
+  ctx.lineTo(W,skyH+70);ctx.closePath();ctx.fill();
+  ctx.restore();
+}
+
+// Tree positions — carefully placed LEFT and RIGHT only, never in middle corridor (rx 0.25-0.75)
+function drawTrees(skyH){
+  const treeDefs=[
+    // LEFT SIDE trees
+    {rx:0.03,ry:0.50,s:32},{rx:0.09,ry:0.58,s:28},{rx:0.06,ry:0.72,s:36},
+    {rx:0.13,ry:0.63,s:24},{rx:0.16,ry:0.78,s:30},{rx:0.02,ry:0.82,s:22},
+    {rx:0.19,ry:0.88,s:26},{rx:0.11,ry:0.90,s:20},
+    // RIGHT SIDE trees
+    {rx:0.78,ry:0.48,s:30},{rx:0.83,ry:0.62,s:34},{rx:0.88,ry:0.52,s:28},
+    {rx:0.92,ry:0.74,s:32},{rx:0.96,ry:0.58,s:25},{rx:0.80,ry:0.80,s:36},
+    {rx:0.75,ry:0.90,s:22},{rx:0.93,ry:0.88,s:28},{rx:0.97,ry:0.82,s:20},
+    // Scattered sides (between paths — but ensure NOT on path lines rx 0.26-0.74 at path heights)
+    {rx:0.22,ry:0.42,s:22},{rx:0.24,ry:0.84,s:18},
+    {rx:0.73,ry:0.42,s:20},{rx:0.76,ry:0.85,s:24},
+  ];
+  const type=LOCS[curLoc].type;
+  treeDefs.forEach(({rx,ry,s})=>{
+    const tx=rx*W, ty=ry*(H-skyH)+skyH;
+    drawTree(tx,ty,s,type);
+  });
+}
+
+function drawTree(tx,ty,size,type){
+  ctx.save();
+  const trunkW=size*.11,trunkH=size*.30;
+  const trunkCol='#4a3018';
+  ctx.fillStyle=trunkCol;
+  ctx.fillRect(tx-trunkW/2,ty,trunkW,trunkH);
+
+  if(type==='cold'){
+    // Conifer layers
+    for(let l=0;l<3;l++){
+      const ly=ty-l*size*.26-size*.08;
+      const lw=size*(0.48-l*.09);
+      ctx.fillStyle=l%2?'#1e4a1e':'#2a5e2a';
+      ctx.beginPath();
+      ctx.moveTo(tx,ly-size*.32);
+      ctx.bezierCurveTo(tx+lw*.4,ly-size*.05,tx+lw,ly+size*.1,tx+lw*.25,ly+size*.13);
+      ctx.bezierCurveTo(tx,ly+size*.18,tx-lw*.25,ly+size*.13,tx-lw,ly+size*.1);
+      ctx.bezierCurveTo(tx-lw*.4,ly-size*.05,tx,ly-size*.32,tx,ly-size*.32);
+      ctx.fill();
+    }
+  } else if(type==='jungle'){
+    // Round tropical
+    const g=ctx.createRadialGradient(tx,ty-size*.3,0,tx,ty-size*.1,size*.55);
+    g.addColorStop(0,'#1e5c1e');g.addColorStop(0.6,'#174d17');g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g;
+    ctx.beginPath();ctx.ellipse(tx,ty-size*.18,size*.52,size*.48,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(tx+size*.22,ty+size*.08,size*.32,size*.32,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(tx-size*.2,ty+size*.06,size*.30,size*.30,0,0,Math.PI*2);ctx.fill();
+  } else {
+    // Deciduous blob
+    const g=ctx.createRadialGradient(tx,ty-size*.22,0,tx,ty,size*.52);
+    g.addColorStop(0,'#2d7030');g.addColorStop(0.7,'#235528');g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g;
+    const pts=7;
+    ctx.beginPath();
+    for(let p=0;p<pts;p++){
+      const ang=(p/pts)*Math.PI*2-Math.PI/2;
+      const r=size*(0.36+hash(Math.floor(tx*.1+p),Math.floor(ty*.1))*.20);
+      const px2=tx+Math.cos(ang)*r,py2=(ty-size*.18)+Math.sin(ang)*r*.82;
+      if(p===0)ctx.moveTo(px2,py2);else ctx.lineTo(px2,py2);
+    }
+    ctx.closePath();ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawGroundFeatures(skyH){
+  // Logs and clutter — placed far from paths
+  [[W*.28,H*.78],[W*.55,H*.85],[W*.35,H*.92]].forEach(([cx,cy])=>drawLog(cx,cy));
+  [[W*.31,H*.84],[W*.62,H*.80],[W*.20,H*.86]].forEach(([cx,cy])=>drawClutter(cx,cy));
+}
+
+function drawLog(cx,cy){
+  ctx.save();
+  ctx.translate(cx,cy);ctx.rotate(0.4);
+  ctx.fillStyle='#7a3818';
+  ctx.beginPath();ctx.roundRect(-26,-6,52,12,6);ctx.fill();
+  ctx.strokeStyle='rgba(0,0,0,.25)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.ellipse(-24,0,6,6,0,0,Math.PI*2);ctx.stroke();
+  ctx.beginPath();ctx.ellipse(24,0,6,6,0,0,Math.PI*2);ctx.stroke();
+  ctx.restore();
+}
+
+function drawClutter(cx,cy){
+  for(let i=0;i<6;i++){
+    const n1=hash(i*9+Math.floor(cx*.01),3),n2=hash(i*13+Math.floor(cy*.01),7);
+    ctx.save();ctx.translate(cx+(n1-.5)*45,cy+(n2-.5)*25);ctx.rotate(n1*Math.PI*2);
+    ctx.strokeStyle=`rgba(${70+Math.round(n2*40)},${55+Math.round(n1*30)},25,0.55)`;
+    ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-10+n1*5,0);ctx.lineTo(10-n2*5,0);ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawRockCluster(skyH){
+  if(!scene) return;
+  // Rocks on the wrong branch path — prominently visible
+  scene.rocks.forEach((r,i)=>{
+    const cx=r.rx*W,cy=r.ry*(H-skyH)+skyH;
+    const n1=hash(i*7,3),n2=hash(i*13,5),n3=hash(i*17,9);
+    const rw=14+n3*16,rh=10+n3*12;
+    // Shadow
+    ctx.save();ctx.fillStyle='rgba(0,0,0,0.3)';
+    ctx.beginPath();ctx.ellipse(cx+3,cy+4,rw,rh,n1*.8,0,Math.PI*2);ctx.fill();
+    // Rock body — gray gradient
+    const rg=ctx.createRadialGradient(cx-rw*.2,cy-rh*.2,0,cx,cy,rw);
+    rg.addColorStop(0,`rgb(${120+Math.round(n1*25)},${118+Math.round(n2*20)},${110+Math.round(n3*15)})`);
+    rg.addColorStop(0.7,`rgb(${85+Math.round(n1*20)},${83+Math.round(n2*18)},${78+Math.round(n3*12)})`);
+    rg.addColorStop(1,`rgb(${60+Math.round(n1*15)},${58+Math.round(n2*12)},${54})`);
+    ctx.fillStyle=rg;
+    ctx.beginPath();ctx.ellipse(cx,cy,rw,rh,n1*.8,0,Math.PI*2);ctx.fill();
+    // Highlight
+    ctx.fillStyle='rgba(255,255,255,0.12)';
+    ctx.beginPath();ctx.ellipse(cx-rw*.25,cy-rh*.25,rw*.35,rh*.3,n1*.8,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+
+    // ⚠ DANGER label near first rock cluster
+    if(i===0){
+      ctx.save();
+      ctx.fillStyle='rgba(255,255,255,0.85)';
+      ctx.beginPath();if(ctx.roundRect)ctx.roundRect(cx-30,cy-26,60,12,2);else ctx.rect(cx-30,cy-26,60,12);ctx.fill();
+      ctx.font='bold 7px "Space Mono",monospace';ctx.fillStyle='#cc2040';ctx.textAlign='center';
+      ctx.fillText('🪨 ROCKS ⚠',cx,cy-17);ctx.restore();
+    }
+  });
+
+  // Danger glow over rock zone
+  const dg=ctx.createRadialGradient(W*.465,H*.76,0,W*.465,H*.76,65);
+  dg.addColorStop(0,'rgba(255,64,96,.18)');dg.addColorStop(1,'rgba(255,64,96,0)');
+  ctx.fillStyle=dg;ctx.beginPath();ctx.ellipse(W*.465,H*.76,80,55,0,0,Math.PI*2);ctx.fill();
+}
+
+function drawDirtPath(pts,col,width,skyH){
+  if(pts.length<2) return;
+  ctx.save();ctx.globalAlpha=.55;
+  ctx.strokeStyle=col;ctx.lineWidth=width;ctx.lineCap='round';ctx.lineJoin='round';
+  ctx.beginPath();pts.forEach((p,i)=>{const x=p.rx*W,y=p.ry*H;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});ctx.stroke();
+  ctx.globalAlpha=.7;ctx.strokeStyle='#c0a878';ctx.lineWidth=width*.55;
+  ctx.beginPath();pts.forEach((p,i)=>{const x=p.rx*W,y=p.ry*H;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});ctx.stroke();
+  // Ruts
+  ctx.globalAlpha=.35;ctx.strokeStyle='#7a6040';ctx.lineWidth=3;
+  for(let r=-1;r<=1;r+=2){
+    ctx.beginPath();pts.forEach((p,i)=>{const x=p.rx*W+r*5,y=p.ry*H+1;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawPathLine(pts,color,width,isDashed){
+  if(pts.length<2)return;
+  ctx.save();ctx.strokeStyle=color;ctx.lineWidth=width;
+  if(isDashed)ctx.setLineDash([9,5]);
+  ctx.lineJoin='round';ctx.lineCap='round';
+  ctx.beginPath();pts.forEach((p,i)=>{const x=p.rx*W,y=p.ry*H;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});ctx.stroke();
+  ctx.setLineDash([]);ctx.restore();
+}
+
+function drawPartialPath(pts,color,width,dash,prog){
+  if(pts.length<2)return;
+  const n=pts.length-1;
+  const maxSeg=Math.min(n,Math.floor(prog*n)+1);
+  ctx.save();ctx.strokeStyle=color;ctx.lineWidth=width;
+  if(dash&&dash[1]>0)ctx.setLineDash(dash);
+  ctx.shadowColor=color;ctx.shadowBlur=7;
+  ctx.lineJoin='round';ctx.lineCap='round';
+  ctx.beginPath();
+  for(let i=0;i<=maxSeg;i++){
+    const p=pts[Math.min(i,n)];const x=p.rx*W,y=p.ry*H;
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  }
+  ctx.stroke();ctx.setLineDash([]);ctx.restore();
+}
+
+function labelPath(pt,label,color){
+  if(!pt)return;
+  const x=pt.rx*W,y=pt.ry*H-14;
+  ctx.save();
+  ctx.font='bold 7px "Space Mono",monospace';
+  const tw=ctx.measureText(label).width;
+  ctx.fillStyle='rgba(255,255,255,0.85)';
+  if(ctx.roundRect)ctx.roundRect(x-tw/2-5,y-6,tw+10,13,2);else ctx.rect(x-tw/2-5,y-6,tw+10,13);
+  ctx.fill();
+  ctx.fillStyle=color;ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(label,x,y+1);ctx.restore();
+}
+
+function drawForkMarker(x,y){
+  ctx.save();
+  ctx.fillStyle='rgba(255,255,255,0.12)';
+  ctx.beginPath();ctx.arc(x,y,12,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,0.5)';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.arc(x,y,12,0,Math.PI*2);ctx.stroke();
+  ctx.font='bold 6px "Space Mono",monospace';ctx.fillStyle='rgba(255,255,255,0.8)';
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText('FORK',x,y);ctx.restore();
+}
+
+function applyWeather(){
+  if(curWx==='fog'){ctx.fillStyle='rgba(190,200,210,.48)';ctx.fillRect(0,0,W,H);}
+  else if(curWx==='rain'){
+    ctx.fillStyle='rgba(40,60,90,.20)';ctx.fillRect(0,0,W,H);
+    ctx.save();ctx.globalAlpha=.4;ctx.strokeStyle='#88aacc';ctx.lineWidth=1;
+    const t=Date.now()*.012;
+    for(let i=0;i<80;i++){
+      const rx=((Math.sin(i*41.3+t)*.5+.5)*W),ry=((Math.sin(i*17.7+t*1.3)*.5+.5)*H);
+      ctx.beginPath();ctx.moveTo(rx,ry);ctx.lineTo(rx-1,ry+14);ctx.stroke();
+    }
+    ctx.restore();
+  } else if(curWx==='night'){
+    ctx.fillStyle='rgba(2,5,20,.70)';ctx.fillRect(0,0,W,H);
+    const p=getUGVPos();
+    if(p){
+      const gl=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,110);
+      gl.addColorStop(0,'rgba(255,255,180,.32)');gl.addColorStop(1,'rgba(255,255,180,0)');
+      ctx.fillStyle=gl;ctx.beginPath();ctx.arc(p.x,p.y,110,0,Math.PI*2);ctx.fill();
+    }
+  }
+}
+
+function drawMarker(x,y,col,txt){
+  ctx.save();ctx.fillStyle=col;ctx.font='bold 6px "Space Mono",monospace';
+  const tw=ctx.measureText(txt).width,pw=tw+7,ph=11;
+  if(ctx.roundRect){ctx.beginPath();ctx.roundRect(x-pw/2,y-ph/2,pw,ph,2);ctx.fill();}
+  else ctx.fillRect(x-pw/2,y-ph/2,pw,ph);
+  ctx.fillStyle='#000';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(txt,x,y);
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════
+// UGV POSITION
+// ═══════════════════════════════════════════
+function lerp(a,b,t){return a+(b-a)*t;}
+function lerpPts(pts,t){
+  const n=pts.length-1,seg=Math.min(Math.floor(t*n),n-1),f=(t*n)-seg;
+  const p0=pts[seg],p1=pts[seg+1];
+  return{x:lerp(p0.rx,p1.rx,f)*W,y:lerp(p0.ry,p1.ry,f)*H,
+    ang:Math.atan2((p1.ry-p0.ry)*H,(p1.rx-p0.rx)*W)};
+}
+
+function getUGVPos(){
+  if(!scene) return null;
+  if(ugvPhase===0) return lerpPts(scene.pathA,Math.min(ugvT,1));
+  if(ugvPhase===1) return lerpPts(scene.wrongBranch,Math.min(wrongT,1));
+  if(ugvPhase===2) return lerpPts(scene.wrongBranch,1); // stopped at rock
+  if(ugvPhase===3) return lerpPts(scene.reversePath,Math.min(reverseT,1));
+  if(ugvPhase===4) return lerpPts(scene.reversePath,1); // brief pause at junction
+  if(ugvPhase===5) return lerpPts(scene.pathB,Math.min(pathBT,1));
+  return null;
+}
+
+function drawUGV(){
+  const p=getUGVPos();if(!p)return;
+  const wrong=ugvPhase>=1&&ugvPhase<=2;
+  const reversing=ugvPhase===3;
+
+  // Glow
+  const gc=wrong?'rgba(255,64,96,.28)':reversing?'rgba(255,214,0,.22)':'rgba(0,255,231,.20)';
+  const gl=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,28);
+  gl.addColorStop(0,gc);gl.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=gl;ctx.beginPath();ctx.arc(p.x,p.y,28,0,Math.PI*2);ctx.fill();
+
+  // Reverse blink indicator
+  if(reversing&&Math.sin(Date.now()*.01)>0){
+    ctx.save();ctx.fillStyle='rgba(255,214,0,0.6)';
+    ctx.beginPath();ctx.arc(p.x,p.y-20,5,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
+
+  ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.ang);
+
+  // Shadow
+  ctx.fillStyle='rgba(0,0,0,.32)';ctx.beginPath();ctx.ellipse(2,11,16,5,0,0,Math.PI*2);ctx.fill();
+
+  // Chassis
+  ctx.fillStyle='#2a3a50';
+  ctx.beginPath();if(ctx.roundRect)ctx.roundRect(-16,-9,32,18,5);else ctx.rect(-16,-9,32,18);ctx.fill();
+
+  // Body — red when wrong path
+  ctx.fillStyle=wrong?'#b03020':reversing?'#b07010':'#1a6fd4';
+  ctx.beginPath();if(ctx.roundRect)ctx.roundRect(-13,-8,26,14,4);else ctx.rect(-13,-8,26,14);ctx.fill();
+
+  // Cab
+  ctx.fillStyle=wrong?'#601808':reversing?'#604a08':'#0f2d55';
+  ctx.beginPath();if(ctx.roundRect)ctx.roundRect(-8,-16,16,10,3);else ctx.rect(-8,-16,16,10);ctx.fill();
+
+  // Windshield
+  ctx.fillStyle='rgba(147,197,253,0.85)';
+  ctx.beginPath();if(ctx.roundRect)ctx.roundRect(-6,-14,12,7,2);else ctx.rect(-6,-14,12,7);ctx.fill();
+
+  // Antenna + sensor
+  ctx.strokeStyle='#aaa';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(0,-16);ctx.lineTo(0,-22);ctx.stroke();
+  ctx.fillStyle=wrong?'#ff4060':'#00ffe7';ctx.beginPath();ctx.arc(0,-22,2.5,0,Math.PI*2);ctx.fill();
+
+  // Headlight
+  ctx.fillStyle='#fde68a';ctx.shadowColor='#fde68a';ctx.shadowBlur=10;
+  ctx.beginPath();ctx.arc(15,0,3,0,Math.PI*2);ctx.fill();
+  // Reverse lights (rear) when reversing
+  if(reversing){ctx.fillStyle='#ff8040';ctx.shadowColor='#ff8040';ctx.beginPath();ctx.arc(-15,0,3,0,Math.PI*2);ctx.fill();}
+  ctx.shadowBlur=0;
+
+  // Wheels
+  ctx.fillStyle='#111';
+  [[-9,9],[9,9],[-9,-9],[9,-9]].forEach(([dx,dy])=>{
+    ctx.beginPath();ctx.ellipse(dx,dy,5,3.5,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#2a2a2a';ctx.beginPath();ctx.ellipse(dx,dy,2.5,2,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#111';
+  });
+
+  ctx.restore();
+
+  // Rock detection radar ring (phase 2)
+  if(ugvPhase===2){
+    const ring=ctx.createRadialGradient(p.x,p.y,18,p.x,p.y,35);
+    ring.addColorStop(0,'rgba(255,64,96,0)');
+    ring.addColorStop(0.5,'rgba(255,64,96,.35)');
+    ring.addColorStop(1,'rgba(255,64,96,0)');
+    ctx.fillStyle=ring;ctx.beginPath();ctx.arc(p.x,p.y,35,0,Math.PI*2);ctx.fill();
+    // scan line rotating
+    ctx.save();ctx.translate(p.x,p.y);ctx.rotate(Date.now()*.004);
+    ctx.strokeStyle='rgba(255,64,96,0.7)';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(32,0);ctx.stroke();
+    ctx.restore();
+  }
+}
+
+// ═══════════════════════════════════════════
+// ANIMATION LOOP
+// ═══════════════════════════════════════════
+function loop(){
+  if(!paused&&scene){
+    const td=TERRAIN_DATA[LOCS[curLoc].type];
+    const spd=td.speed*WX[curWx].sm*0.00075; // 5x faster
+
+    if(ugvPhase===0){
+      ugvT+=spd;
+      if(ugvT>1) ugvT=0; // loop
+    } else if(ugvPhase===1){
+      wrongT+=spd*1.2;
+      if(wrongT>=1){
+        // Reached rock — STOP
+        wrongT=1;ugvPhase=2;
+        showAlert('🪨 ROCK DETECTED! STOPPING VEHICLE...','danger');
+        showRockBadge(true);
+        showAIPanel(true);
+        updateRouteStatus('ROCK BLOCKED','err');
+        setTimeout(()=>{
+          showAlert('↩ REVERSING — AI COMPUTING SAFE ROUTE','warn');
+          ugvPhase=3;reverseT=0;
+          showRockBadge(false);
+        },2000);
+      }
+    } else if(ugvPhase===3){
+      reverseT+=spd*.9;
+      if(reverseT>=1){
+        reverseT=1;ugvPhase=4;
+        showAlert('🔀 SWITCHING TO PATH B — AI APPROVED','reroute');
+        updateRouteStatus('SWITCHING PATH B','warn');
+        setTimeout(()=>{
+          ugvPhase=5;pathBT=0;
+          showAlert('✔ NOW ON PATH B — SAFE ROUTE RESTORED','safe');
+          updateRouteStatus('ON ROUTE (PATH B)','ok');
+          showAIPanel(false);
+        },1200);
+      }
+    } else if(ugvPhase===4){
+      // brief pause — handled by setTimeout
+    } else if(ugvPhase===5){
+      pathBT+=spd;
+      if(pathBT>1) pathBT=0; // loop path B
+    }
+
+    // HUD progress
+    const pct=ugvPhase===5?Math.round(pathBT*100):Math.round(ugvT*100);
+    $('h-pct',pct+'%');
+    document.getElementById('h-prog').style.width=pct+'%';
+  }
+  drawAll();
+  updateSpeedGraph();
+  animId=requestAnimationFrame(loop);
+}
+
+function updateHUD(){
+  const p=getUGVPos();if(!p)return;
+  $('h-coords',`X:${Math.round(p.x)} Y:${Math.round(p.y)}`);
+  const zoneLabel=ugvPhase>=1&&ugvPhase<=2?'Rocks':ugvPhase===3?'G.Clutter':ugvPhase>=4?'Landscape':'Landscape';
+  $('h-zone',zoneLabel);
+  $('st-zone',zoneLabel);
+  $('h-conf',`CONF: ${ugvPhase===2?'38':'72'}%`);
+}
+
+// ═══════════════════════════════════════════
+// CONTROLS
+// ═══════════════════════════════════════════
+function triggerWrongPath(){
+  if(!scene||curLoc<0)return;
+  // Reset and start wrong path from fork point
+  ugvT=6/14; // position at fork on pathA (index 6 of 13 pts)
+  ugvPhase=1;wrongT=0;reverseT=0;pathBT=0;
+  showAlert('↪ UGV TAKING WRONG BRANCH — APPROACHING ROCKS','danger');
+  updateRouteStatus('WRONG PATH','err');
+  showAIPanel(false);showRockBadge(false);
+}
+
+function resetUGV(){
+  ugvT=0;ugvPhase=0;wrongT=0;reverseT=0;pathBT=0;
+  updateRouteStatus('ON ROUTE','ok');
+  showAIPanel(false);showRockBadge(false);
+  document.getElementById('alert-banner').className='alert-banner';
+}
+
+function showAIPanel(show){
+  const el=document.getElementById('ai-panel');
+  el.classList.toggle('show',show);
+}
+
+function showRockBadge(show){
+  const p=getUGVPos();
+  const el=document.getElementById('rock-badge');
+  if(show&&p){
+    el.style.left=(p.x-70)+'px';el.style.top=(p.y-40)+'px';
+    el.classList.add('show');
+  } else {
+    el.classList.remove('show');
+  }
+}
+
+function updateRouteStatus(txt,cls){
+  const el=document.getElementById('route-status');
+  el.textContent=(cls==='ok'?'▶ ':cls==='err'?'✖ ':'↩ ')+txt;
+  el.className='route-status '+cls;
+}
+
+function showAlert(msg,type){
+  const el=document.getElementById('alert-banner');
+  el.textContent=msg;el.className='alert-banner show '+type;
+  clearTimeout(alertTimer);
+  alertTimer=setTimeout(()=>{el.className='alert-banner';},3500);
+}
+
+function setWx(wx,btn){
+  curWx=wx;
+  document.querySelectorAll('.tbtn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  $('st-wx',WX[wx].label);
+  if(curLoc>=0){
+    const td=TERRAIN_DATA[LOCS[curLoc].type];
+    const s=(td.speed*WX[wx].sm).toFixed(1);
+    $('h-speed',s+' km/h');$('sv-spd',s);$('st-spd',s+' km/h');
+  }
+}
+
+function togglePause(){
+  paused=!paused;
+  const btn=document.getElementById('pbtn');
+  btn.textContent=paused?'▶ RESUME':'⏸ PAUSE';
+  btn.classList.toggle('on',paused);
+}
+
+// ═══════════════════════════════════════════
+// SELECT LOCATION
+// ═══════════════════════════════════════════
+function selectLoc(idx){
+  curLoc=idx;
+  resetUGV();
+  document.querySelectorAll('.lcard').forEach((c,i)=>c.classList.toggle('active',i===idx));
+  scene=buildScene();
+  document.getElementById('path-key-panel').style.display='block';
+
+  const loc=LOCS[idx],td=TERRAIN_DATA[loc.type],spd=(td.speed*WX[curWx].sm).toFixed(1);
+  $('st-loc',loc.name);$('st-terrain',td.label);$('st-spd',spd+' km/h');
+  $('h-speed',spd+' km/h');$('h-risk',td.risk+' RISK');
+  document.getElementById('h-risk').style.color=td.rc;
+  $('sv-safe',td.safe+'%');$('sv-spd',spd);$('sv-obs',td.obs+'');$('sv-risk',td.risk);
+  document.getElementById('sv-safe').style.color=td.safe>55?'var(--grn)':td.safe>35?'var(--yel)':'var(--red)';
+  buildSegStrip(td);buildCBars(td);buildIoU();
+  fetchSideAI(loc,td);
+}
+
+function buildSegStrip(td){
+  document.getElementById('seg-strip').innerHTML=CLASSES.map((cls,i)=>{
+    const w=td.weights[i]||0;
+    return`<div class="seg-chunk" style="width:${w*100}%;background:${cls.color};">${w>.09?Math.round(w*100)+'%':''}</div>`;
+  }).join('');
+  document.getElementById('tbars').innerHTML=CLASSES.map((cls,i)=>{
+    const w=td.weights[i]||0;
+    return`<div class="cbar"><div class="crow"><div style="display:flex;align-items:center;"><div class="cdot" style="background:${cls.color};"></div>${cls.name}</div><span>${Math.round(w*100)}%</span></div><div class="cbg"><div class="cfill" style="width:${w*100}%;background:${cls.color};"></div></div></div>`;
+  }).join('');
+}
+
+function buildCBars(td){
+  document.getElementById('cbars').innerHTML=CLASSES.map(cls=>{
+    const conf=td.conf[cls.name];if(!conf)return'';
+    const v=conf[0].v,danger=td.danger.includes(cls.name);
+    return`<div class="iou-row"><div class="idot" style="background:${cls.color};"></div><div class="iname">${cls.name}${danger?' ⚠':''}</div><div class="ibg"><div style="height:100%;width:${Math.round(v*100)}%;background:${cls.color};border-radius:2px;"></div></div><div class="inum">${Math.round(v*100)}%</div></div>`;
+  }).join('');
+}
+
+function buildIoU(){
+  document.getElementById('ioulist').innerHTML=CLASSES.map(cls=>
+    `<div class="iou-row"><div class="idot" style="background:${cls.color};"></div><div class="iname">${cls.name}</div><div class="ibg"><div style="height:100%;width:${Math.round(cls.iou*100)}%;background:${cls.color};border-radius:2px;"></div></div><div class="inum">${cls.iou.toFixed(3)}</div></div>`
+  ).join('');
+}
+
+function buildLegend(){
+  document.getElementById('legend-list').innerHTML=CLASSES.map(cls=>
+    `<div class="leg-item"><div class="leg-dot" style="background:${cls.color};"></div><div class="leg-name">${cls.name}</div></div>`
+  ).join('');
+}
+
+// ═══════════════════════════════════════════
+// AI — uses fetch with proper headers
+// ═══════════════════════════════════════════
+async function callClaude(prompt,maxTokens=200){
+  const res=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true'
+    },
+    body:JSON.stringify({
+      model:'claude-sonnet-4-20250514',
+      max_tokens:maxTokens,
+      messages:[{role:'user',content:prompt}]
+    })
+  });
+  const data=await res.json();
+  if(data.error) throw new Error(data.error.message);
+  return data.content?.map(c=>c.text||'').join('')||'';
+}
+
+async function fetchSideAI(loc,td){
+  const box=document.getElementById('aibox');
+  box.className='ai-box loading';
+  box.innerHTML=`<span style="color:var(--acc);">⚡ Analyzing terrain...</span><span class="cur"></span>`;
+  const prompt=`UGV terrain AI. Location: ${loc.name}, ${loc.region}. Terrain: ${td.label}. Safety: ${td.safe}%. Risk: ${td.risk}. Obstacles: ${td.obs}. Danger zones: ${td.danger.join(', ')}. Weather: ${WX[curWx].label}. Write 3 sentences: terrain overview, main hazards, recommended speed. Military tone. Max 55 words.`;
+  try{
+    const text=await callClaude(prompt,200);
+    box.className='ai-box done';
+    box.innerHTML=`<span style="color:var(--acc);font-size:6px;letter-spacing:1px;font-weight:700;">▶ AI ASSESSMENT</span><br><br>${text}`;
+  }catch(e){
+    box.className='ai-box done';
+    box.innerHTML=`<span style="color:var(--yel);">⚠ OFFLINE</span><br><br>${td.label}. Hazards: ${td.danger.join(', ')}. Safety: ${td.safe}%. Rec. speed: ${(td.speed*WX[curWx].sm).toFixed(1)} km/h.`;
+  }
+}
+
+async function runAIPredict(){
+  if(curLoc<0)return;
+  const loc=LOCS[curLoc],td=TERRAIN_DATA[loc.type];
+  const box=document.getElementById('aibox');
+  box.className='ai-box loading';
+  box.innerHTML=`<span style="color:var(--acc);">⚡ Running full prediction...</span><span class="cur"></span>`;
+  const wrongStatus=ugvPhase>=1?`CURRENT STATUS: Vehicle encountered rocks on wrong branch, rerouted to Path B.`:'';
+  const prompt=`UGV Full Terrain Prediction. Location: ${loc.name}. Terrain: ${td.label}. Safety: ${td.safe}%. Risk: ${td.risk}. Obstacles: ${td.obs}. Danger classes: ${td.danger.join(', ')}. Weather: ${WX[curWx].label}. Speed: ${(td.speed*WX[curWx].sm).toFixed(1)} km/h. ${wrongStatus}
+Provide: (1) Route safety score with reasoning, (2) Rock/obstacle avoidance priority, (3) Path A vs Path B recommendation, (4) Speed adjustment for current weather. Military tactical tone. Max 80 words.`;
+  try{
+    const text=await callClaude(prompt,350);
+    box.className='ai-box done';
+    box.innerHTML=`<span style="color:var(--acc);font-size:6px;letter-spacing:1px;font-weight:700;">▶ FULL TACTICAL PREDICTION</span><br><br>${text}`;
+  }catch(e){
+    box.className='ai-box done';
+    box.innerHTML=`<span style="color:var(--yel);">⚠ OFFLINE — CACHED ASSESSMENT</span><br><br>Route safety: ${td.safe}%. Primary hazards: ${td.danger.join(', ')} (${td.obs} obstacles). Path B recommended when rocks block Path A. Speed: ${(td.speed*WX[curWx].sm).toFixed(1)} km/h. ${td.risk==='HIGH'?'High risk — reduce speed 30%.':'Proceed with caution.'}`;
+  }
+}
+
+// ═══════════════════════════════════════════
+// SPEED GRAPH
+// ═══════════════════════════════════════════
+const SPEED_HISTORY_MAX = 80;
+let speedHistory = [];
+let speedGraphTimer = 0;
+
+function getCurrentSpeedKmh(){
+  if(!scene||curLoc<0) return 0;
+  const td=TERRAIN_DATA[LOCS[curLoc].type];
+  const base=td.speed*WX[curWx].sm;
+  // Modulate by phase
+  if(ugvPhase===2) return 0; // stopped at rock
+  if(ugvPhase===3) return base*0.4; // reversing slow
+  if(ugvPhase===4) return 0; // brief pause
+  if(ugvPhase===1) return base*0.7; // wrong path cautious
+  return base;
+}
+
+function updateSpeedGraph(){
+  const gc=document.getElementById('speedGraph');
+  if(!gc) return;
+  const gctx=gc.getContext('2d');
+  const GW=gc.width, GH=gc.height;
+  const spd=getCurrentSpeedKmh();
+  speedHistory.push(spd);
+  if(speedHistory.length>SPEED_HISTORY_MAX) speedHistory.shift();
+
+  gctx.clearRect(0,0,GW,GH);
+
+  // Background
+  gctx.fillStyle='#f8fafc';
+  gctx.fillRect(0,0,GW,GH);
+
+  // Grid lines
+  const maxSpd=14;
+  gctx.strokeStyle='rgba(100,150,180,0.2)';gctx.lineWidth=0.5;
+  for(let g=0;g<=4;g++){
+    const gy=GH-(g/4)*GH;
+    gctx.beginPath();gctx.moveTo(0,gy);gctx.lineTo(GW,gy);gctx.stroke();
+    gctx.fillStyle='rgba(100,150,180,0.5)';gctx.font='6px monospace';
+    gctx.textAlign='left';gctx.fillText(Math.round(g/4*maxSpd),2,gy-2);
+  }
+
+  if(speedHistory.length<2) return;
+
+  // Filled area
+  const grad=gctx.createLinearGradient(0,0,0,GH);
+  grad.addColorStop(0,'rgba(0,119,204,0.35)');
+  grad.addColorStop(1,'rgba(0,119,204,0.03)');
+  gctx.fillStyle=grad;
+  gctx.beginPath();
+  speedHistory.forEach((v,i)=>{
+    const x=(i/(SPEED_HISTORY_MAX-1))*GW;
+    const y=GH-(v/maxSpd)*GH;
+    i===0?gctx.moveTo(x,GH):gctx.lineTo(x,y);
+  });
+  gctx.lineTo(GW,GH);gctx.closePath();gctx.fill();
+
+  // Line
+  gctx.strokeStyle=spd===0?'#e02040':spd<3?'#c88000':'#0077cc';
+  gctx.lineWidth=1.5;gctx.lineJoin='round';gctx.lineCap='round';
+  gctx.beginPath();
+  speedHistory.forEach((v,i)=>{
+    const x=(i/(SPEED_HISTORY_MAX-1))*GW;
+    const y=GH-(v/maxSpd)*GH;
+    i===0?gctx.moveTo(x,y):gctx.lineTo(x,y);
+  });
+  gctx.stroke();
+
+  // Current value dot
+  const lx=GW, ly=GH-(spd/maxSpd)*GH;
+  gctx.fillStyle=spd===0?'#e02040':spd<3?'#c88000':'#0077cc';
+  gctx.beginPath();gctx.arc(lx-1,ly,3.5,0,Math.PI*2);gctx.fill();
+
+  // Current speed label
+  gctx.fillStyle='#1a2a38';gctx.font='bold 8px monospace';
+  gctx.textAlign='right';
+  gctx.fillText(spd.toFixed(1)+' km/h',GW-3,10);
+}
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+function initCanvas(){
+  cv=document.getElementById('terrainCanvas');
+  const wrap=cv.parentElement;
+  W=wrap.clientWidth;H=wrap.clientHeight;
+  cv.width=W;cv.height=H;
+  ctx=cv.getContext('2d');
+}
+
+window.addEventListener('resize',()=>{
+  initCanvas();
+  if(curLoc>=0)scene=buildScene();
+});
+
+function $(id,val){const el=document.getElementById(id);if(el&&val!==undefined)el.textContent=val;}
+
+window.addEventListener('load',()=>{
+  initCanvas();
+  buildLegend();
+  buildIoU();
+  selectLoc(0);
+  loop();
+});
+</script>
+</body>
+</html>
